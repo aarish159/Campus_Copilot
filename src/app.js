@@ -1,10 +1,11 @@
 // const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
 //   ? "https://campus-copilot-alp1.onrender.com"
 //   : "";
+import { defaultState, demoUsers, navByRole, pageLabels } from "./data.js";
 const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
   ? "https://campus-copilot-0ewc.onrender.com"
   : "";
-import { defaultState, demoUsers, navByRole, pageLabels } from "./data.js";
+
 
 
 const icons = {
