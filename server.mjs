@@ -132,7 +132,22 @@ const bearerToken = (req) => {
 
 createServer(async (req, res) => {
   try {
-    res.setHeader("Access-Control-Allow-Origin", "https://campuscopilott.netlify.app");
+    const origin = req.headers.origin || "";
+    const allowedOrigins = [
+      "https://campuscopilott.netlify.app",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
+      "http://localhost:5500",
+      "http://127.0.0.1:5500",
+      "https://localhost:4173",
+      "https://127.0.0.1:4173",
+    ];
+
+    if (origin && (allowedOrigins.includes(origin) || origin.endsWith(".github.io") || origin.endsWith(".netlify.app"))) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else if (!origin) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }

@@ -1,10 +1,6 @@
-// const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
-//   ? "https://campus-copilot-alp1.onrender.com"
-//   : "";
 import { defaultState, demoUsers, navByRole, pageLabels } from "./data.js";
-const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
-  ? "https://campus-copilot-0ewc.onrender.com"
-  : "";
+
+const FALLBACK_API_BASE = "https://campus-copilot-0ewc.onrender.com";
 
 
 
@@ -67,25 +63,40 @@ function saveSession(value) {
 }
 
 async function api(path, { method = "GET", body } = {}) {
-  const fullPath = path.startsWith("http") ? path : API_BASE + path;
-  const response = await fetch(fullPath, {
-    method,
-    headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    if (response.status === 401 && session) saveSession(null);
-    throw new Error(payload.error || "The database request failed.");
+  const candidates = [path.startsWith("http") ? path : path];
+  if (!path.startsWith("http")) {
+    candidates.push(`${FALLBACK_API_BASE}${path}`);
   }
-  return payload;
+
+  let lastError = null;
+
+  for (const fullPath of candidates) {
+    try {
+      const response = await fetch(fullPath, {
+        method,
+        headers: {
+          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.ok) return payload;
+
+      if (response.status === 401 && session) saveSession(null);
+      lastError = new Error(payload.error || "The database request failed.");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("The database request failed.");
 }
 
 async function refreshState() {
-  const serverData = await api(API_BASE + "/api/state");
+  const serverData = await api("/api/state");
   state = { ...structuredClone(defaultState), ...serverData };
 
   // Admin: load real users, teachers, subjects
@@ -1760,7 +1771,7 @@ Rules:
     const sessionData = loadSession();
     const authToken = sessionData?.token || null;
 
-    const response = await fetch(API_BASE + "/api/ai/ask", {
+    const response = await fetch("/api/ai/ask", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1810,7 +1821,7 @@ function bindEvents() {
     const data = Object.fromEntries(formData.entries());
 
     try {
-      const response = await fetch(API_BASE + "/api/register/request-otp", {
+      const response = await fetch("/api/register/request-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -1836,7 +1847,7 @@ function bindEvents() {
     const otp = document.querySelector("#otp-input")?.value.trim();
 
     try {
-      const response = await fetch(API_BASE + "/api/register/verify-otp", {
+      const response = await fetch("/api/register/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp }),
@@ -1880,7 +1891,7 @@ function bindEvents() {
     e.preventDefault();
     if (!pendingOtpEmail) { showToast("Go back and fill in the form again.", "error"); return; }
     try {
-      const response = await fetch(API_BASE + "/api/register/request-otp", {
+      const response = await fetch("/api/register/request-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: pendingOtpEmail }),
@@ -1897,7 +1908,7 @@ function bindEvents() {
     event.preventDefault();
     const email = document.querySelector("#forgot-email").value.trim();
     try {
-      const response = await fetch(API_BASE + "/api/auth/forgot-password", {
+      const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -1940,7 +1951,7 @@ function bindEvents() {
     }
 
     try {
-      const response = await fetch(API_BASE + "/api/auth/reset-password", {
+      const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp, newPassword }),
@@ -1963,7 +1974,7 @@ function bindEvents() {
     e.preventDefault();
     if (!pendingOtpEmail) { showToast("Go back and enter your email again.", "error"); return; }
     try {
-      const response = await fetch(API_BASE + "/api/auth/forgot-password", {
+      const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: pendingOtpEmail }),
@@ -1990,7 +2001,7 @@ function bindEvents() {
     const password = document.querySelector("#login-password").value;
 
     try {
-      const response = await fetch(API_BASE + "/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, login_id, password }),
@@ -2355,7 +2366,7 @@ async function handleAction(action, event, button = event?.target?.closest('[dat
   }
   if (action === "logout") {
     try {
-      await api(API_BASE + "/api/auth/logout", { method: "POST" });
+      await api("/api/auth/logout", { method: "POST" });
     } catch {
       // A local sign-out should still succeed if the server session already expired.
     }
@@ -2568,7 +2579,7 @@ async function handleUtilityForm(event) {
       return;
     }
     try {
-      const res = await api(API_BASE + "/api/admin/add-teacher", { method: "POST", body: { name, email, password } });
+      const res = await api("/api/admin/add-teacher", { method: "POST", body: { name, email, password } });
       showToast(`Teacher "${name}" created! Login ID: ${res.loginId}`);
       modal = null;
       await refreshState();
